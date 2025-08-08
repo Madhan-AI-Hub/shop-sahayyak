@@ -72,7 +72,17 @@ export async function fetchProfile() {
 export async function addEntry(entry: FinanceEntry) {
   const supabase = await getSupabase();
   const table = entry.type === "income" ? TABLE_INCOME : TABLE_EXPENSE;
-  const { data, error } = await supabase.from(table).insert(entry).select().single();
+
+  // Ensure we don't insert the `type` field (not present in tables) and set user_id explicitly
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  const userId = userData?.user?.id;
+  if (!userId) throw new Error("Not authenticated");
+
+  const { type, ...rest } = entry as any;
+  const payload = { ...rest, user_id: userId };
+
+  const { data, error } = await supabase.from(table).insert(payload).select().single();
   if (error) throw error;
   return data as FinanceEntry;
 }
